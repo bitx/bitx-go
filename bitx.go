@@ -87,3 +87,45 @@ func (c *Client) Ticker(pair string) (Ticker, error) {
 
 	return Ticker{t, bid, ask, last}, nil
 }
+
+
+type orderbookEntry struct {
+	Price string `json:"price"`
+	Volume string `json:"volume"`
+}
+
+type orderbook struct {
+	Error string `json:"error"`
+	Asks []orderbookEntry `json:"asks"`
+	Bids []orderbookEntry `json:"bids"`
+}
+
+type OrderBookEntry struct {
+	Price, Volume float64
+}
+
+func convert(entries []orderbookEntry) (r []OrderBookEntry) {
+	r = make([]OrderBookEntry, len(entries))
+	for i, e := range entries {
+		price, _ := strconv.ParseFloat(e.Price, 64)
+		volume, _ := strconv.ParseFloat(e.Volume, 64)
+		r[i].Price = price
+		r[i].Volume = volume
+	}
+	return r
+}
+
+func (c *Client) OrderBook(pair string) (
+	bids, asks []OrderBookEntry, err error) {
+
+	var r orderbook
+	err = c.get("/api/1/orderbook", url.Values{"pair": {pair}}, &r)
+	if err != nil {
+		return nil, nil, err
+	}
+	if r.Error != "" {
+		return nil, nil, errors.New("BitX error: " + r.Error)
+	}
+
+	return convert(r.Bids), convert(r.Asks), nil
+}
