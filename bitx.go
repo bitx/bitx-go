@@ -129,3 +129,41 @@ func (c *Client) OrderBook(pair string) (
 
 	return convert(r.Bids), convert(r.Asks), nil
 }
+
+
+type trade struct {
+	Timestamp int64 `json:"timestamp"`
+	Price string `json:"price"`
+	Volume string `json:"volume"`
+}
+
+type trades struct {
+	Error string `json:"error"`
+	Trades []trade `json:"trades"`
+}
+
+type Trade struct {
+	Timestamp time.Time
+	Price, Volume float64
+}
+
+func (c *Client) Trades(pair string) ([]Trade, error) {
+	var r trades
+	err := c.get("/api/1/trades", url.Values{"pair": {pair}}, &r)
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, errors.New("BitX error: " + r.Error)
+	}
+
+	tr := make([]Trade, len(r.Trades))
+	for i, t := range r.Trades {
+		tr[i].Timestamp = time.Unix(t.Timestamp/1000, 0)
+		price, _ := strconv.ParseFloat(t.Price, 64)
+		volume, _ := strconv.ParseFloat(t.Volume, 64)
+		tr[i].Price = price
+		tr[i].Volume = volume
+	}
+	return tr, nil
+}
