@@ -1,3 +1,5 @@
+// Go wrapper for the BitX API.
+// The API is documented here: https://bitx.co.za/api
 package bitx
 
 import "time"
@@ -76,6 +78,7 @@ type Ticker struct {
 	Bid, Ask, Last float64
 }
 
+// Returns the latest ticker indicators for the given currency pair..
 func (c *Client) Ticker(pair string) (Ticker, error) {
 	var r ticker
 	err := c.call("GET", "/api/1/ticker", url.Values{"pair": {pair}}, &r)
@@ -133,6 +136,8 @@ func convert(entries []orderbookEntry) (r []OrderBookEntry) {
 	return r
 }
 
+// Returns a list of bids and asks in the order book for the given currency
+// pair.
 func (c *Client) OrderBook(pair string) (
 	bids, asks []OrderBookEntry, err error) {
 
@@ -165,6 +170,7 @@ type Trade struct {
 	Price, Volume float64
 }
 
+// Returns a list of the most recent trades for the given currency pair.
 func (c *Client) Trades(pair string) ([]Trade, error) {
 	var r trades
 	err := c.call("GET", "/api/1/trades", url.Values{"pair": {pair}}, &r)
@@ -195,6 +201,7 @@ type OrderType string
 const BID = OrderType("BID")
 const ASK = OrderType("ASK")
 
+// Create a new trade order.
 func (c *Client) PostOrder(pair string, order_type OrderType,
 	volume, price float64) (string, error) {
 	form := make(url.Values)
@@ -253,6 +260,8 @@ func atofloat64(s string) float64 {
 	return f
 }
 
+// Returns a list of the most recently placed orders.
+// The list is truncated after 100 items.
 func (c *Client) ListOrders(pair string) ([]Order, error) {
 	var r orders
 	err := c.call("GET", "/api/1/listorders", url.Values{"pair": {pair}}, &r)
@@ -285,6 +294,7 @@ type stoporder struct {
 	Error   string `json:"error"`
 }
 
+// Request to stop an order.
 func (c *Client) StopOrder(id string) error {
 	form := make(url.Values)
 	form.Add("order_id", id)
@@ -310,6 +320,7 @@ type balances struct {
 	Balance []balance `json:"balance"`
 }
 
+// Returns the trading account balance and reserved funds.
 func (c *Client) Balance(asset string) (
 	balance float64, reserved float64, err error) {
 	var r balances
