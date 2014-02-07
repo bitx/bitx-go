@@ -7,24 +7,42 @@ import "errors"
 import "encoding/json"
 import "strconv"
 import "fmt"
+import "bytes"
 
 const userAgent = "bitx-go/0.0.1"
 var base = url.URL{Scheme: "https", Host: "bitx.co.za"}
 
 type Client struct {
+	api_key_id, api_key_secret string
 }
 
-func NewClient() *Client {
-	return &Client{}
+// Pass an empty string for the api_key_id if you will only access the public
+// API.
+func NewClient(api_key_id, api_key_secret string) *Client {
+	return &Client{api_key_id, api_key_secret}
 }
 
-func (c *Client) get(path string, params url.Values, result interface{}) error {
+func (c *Client) call(method, path string, params url.Values,
+	result interface{}) error {
 	u := base
 	u.Path = path
-	u.RawQuery = params.Encode()
-	req, err := http.NewRequest("GET", u.String(), nil)
+
+	var body *bytes.Reader
+	if method == "GET" {
+		u.RawQuery = params.Encode()
+		body = bytes.NewReader(nil)
+	} else if method == "POST" {
+		body = bytes.NewReader([]byte(params.Encode()))
+	} else {
+		return errors.New("Unsupported method")
+	}
+
+	req, err := http.NewRequest(method, u.String(), body)
 	if err != nil {
 		return err
+	}
+	if c.api_key_id != "" {
+		req.SetBasicAuth(c.api_key_id, c.api_key_secret)
 	}
 	req.Header.Add("User-Agent", userAgent)
 	r, err := (&http.Client{}).Do(req)
@@ -60,7 +78,7 @@ type Ticker struct {
 
 func (c *Client) Ticker(pair string) (Ticker, error) {
 	var r ticker
-	err := c.get("/api/1/ticker", url.Values{"pair": {pair}}, &r)
+	err := c.call("GET", "/api/1/ticker", url.Values{"pair": {pair}}, &r)
 	if err != nil {
 		return Ticker{}, err
 	}
@@ -119,7 +137,7 @@ func (c *Client) OrderBook(pair string) (
 	bids, asks []OrderBookEntry, err error) {
 
 	var r orderbook
-	err = c.get("/api/1/orderbook", url.Values{"pair": {pair}}, &r)
+	err = c.call("GET", "/api/1/orderbook", url.Values{"pair": {pair}}, &r)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -149,7 +167,7 @@ type Trade struct {
 
 func (c *Client) Trades(pair string) ([]Trade, error) {
 	var r trades
-	err := c.get("/api/1/trades", url.Values{"pair": {pair}}, &r)
+	err := c.call("GET", "/api/1/trades", url.Values{"pair": {pair}}, &r)
 	if err != nil {
 		return nil, err
 	}
@@ -166,4 +184,147 @@ func (c *Client) Trades(pair string) ([]Trade, error) {
 		tr[i].Volume = volume
 	}
 	return tr, nil
+}
+
+type postorder struct {
+	OrderId string `json:"order_id"`
+	Error   string `json:"error"`
+}
+
+type OrderType string
+const BID = OrderType("BID")
+const ASK = OrderType("ASK")
+
+func (c *Client) PostOrder(pair string, order_type OrderType,
+	volume, price float64) (string, error) {
+	form := make(url.Values)
+	form.Add("volume", fmt.Sprintf("%f", volume))
+	form.Add("price", fmt.Sprintf("%f", price))
+	form.Add("pair", pair)
+	form.Add("type", string(order_type))
+
+	var r postorder
+	err := c.call("POST", "/api/1/postorder", form, &r)
+	if err != nil {
+		return "", err
+	}
+	if r.Error != "" {
+		return "", errors.New("BitX error: " + r.Error)
+	}
+
+	return r.OrderId, nil
+}
+
+type order struct {
+	OrderId             string `json:"order_id"`
+	CreationTimestamp   int64  `json:"creation_timestamp"`
+	Type                string `json:"type"`
+	State               string `json:"state"`
+	LimitPrice          string `json:"limit_price"`
+	LimitVolume         string `json:"limit_volume"`
+	Base                string `json:"base"`
+	Counter             string `json:"counter"`
+	FeeBase             string `json:"fee_base"`
+	FeeCounter          string `json:"fee_counter"`
+}
+
+type orders struct {
+	Error string `json:"error"`
+	Orders []order `json:"orders"`
+}
+
+type OrderState string
+const Pending = OrderState("PENDING")
+const Complete = OrderState("COMPLETE")
+
+type Order struct {
+	Id string
+	CreatedAt time.Time
+	Type OrderType
+	State OrderState
+	LimitPrice float64
+	LimitVolume float64
+	Base, Counter float64
+	FeeBase, FeeCounter float64
+}
+
+func atofloat64(s string) float64 {
+	f, _ := strconv.ParseFloat(s, 64)
+	return f
+}
+
+func (c *Client) ListOrders(pair string) ([]Order, error) {
+	var r orders
+	err := c.call("GET", "/api/1/listorders", url.Values{"pair": {pair}}, &r)
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, errors.New("BitX error: " + r.Error)
+	}
+
+	orders := make([]Order, len(r.Orders))
+	for i, bo := range r.Orders {
+		o := &orders[i]
+		o.Id = bo.OrderId
+		o.Type = OrderType(bo.Type)
+		o.State = OrderState(bo.State)
+		o.CreatedAt = time.Unix(bo.CreationTimestamp/1000, 0)
+		o.LimitPrice = atofloat64(bo.LimitPrice)
+		o.LimitVolume = atofloat64(bo.LimitVolume)
+		o.Base = atofloat64(bo.Base)
+		o.Counter = atofloat64(bo.Counter)
+		o.FeeBase = atofloat64(bo.FeeBase)
+		o.FeeCounter = atofloat64(bo.FeeCounter)
+	}
+	return orders, nil
+}
+
+type stoporder struct {
+	Success bool `json:"success"`
+	Error   string `json:"error"`
+}
+
+func (c *Client) StopOrder(id string) error {
+	form := make(url.Values)
+	form.Add("order_id", id)
+	var r stoporder
+	err := c.call("POST", "/api/1/stoporder", form, &r)
+	if err != nil {
+		return err
+	}
+	if r.Error != "" {
+		return errors.New("BitX error: " + r.Error)
+	}
+	return nil
+}
+
+type balance struct {
+	Asset string `json:"asset"`
+	Balance string `json:"balance"`
+	Reserved string `json:"reserved"`
+}
+
+type balances struct {
+	Error string `json:"error"`
+	Balance []balance `json:"balance"`
+}
+
+func (c *Client) Balance(asset string) (
+	balance float64, reserved float64, err error) {
+	var r balances
+	err = c.call("GET", "/api/1/balance", url.Values{"asset": {asset}}, &r)
+	if err != nil {
+		return 0, 0, err
+	}
+	if r.Error != "" {
+		return 0, 0, errors.New("BitX error: " + r.Error)
+	}
+	if len(r.Balance) == 0 {
+		return 0, 0, errors.New("Balance not returned")
+	}
+
+	balance = atofloat64(r.Balance[0].Balance)
+	reserved = atofloat64(r.Balance[0].Reserved)
+	return balance, reserved, nil
 }
