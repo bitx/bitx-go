@@ -10,9 +10,12 @@ import "encoding/json"
 import "strconv"
 import "fmt"
 import "bytes"
+import "io/ioutil"
+import _ "crypto/sha512"
 
-const userAgent = "bitx-go/0.0.1"
-var base = url.URL{Scheme: "https", Host: "bitx.co.za"}
+const userAgent = "bitx-go/0.0.2"
+
+var base = url.URL{Scheme: "https", Host: "api.mybitx.com"}
 
 type Client struct {
 	api_key_id, api_key_secret string
@@ -47,6 +50,7 @@ func (c *Client) call(method, path string, params url.Values,
 		req.SetBasicAuth(c.api_key_id, c.api_key_secret)
 	}
 	req.Header.Add("User-Agent", userAgent)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r, err := (&http.Client{}).Do(req)
 	if err != nil {
 		return err
@@ -54,8 +58,10 @@ func (c *Client) call(method, path string, params url.Values,
 	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(r.Body)
 		return errors.New(fmt.Sprintf(
-			"BitX error %d: %s", r.StatusCode, r.Status))
+			"BitX error %d: %s: %s",
+			r.StatusCode, r.Status, string(body)))
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(result); err != nil {
@@ -74,7 +80,7 @@ type ticker struct {
 }
 
 type Ticker struct {
-	Timestamp time.Time
+	Timestamp      time.Time
 	Bid, Ask, Last float64
 }
 
@@ -109,16 +115,15 @@ func (c *Client) Ticker(pair string) (Ticker, error) {
 	return Ticker{t, bid, ask, last}, nil
 }
 
-
 type orderbookEntry struct {
-	Price string `json:"price"`
+	Price  string `json:"price"`
 	Volume string `json:"volume"`
 }
 
 type orderbook struct {
-	Error string `json:"error"`
-	Asks []orderbookEntry `json:"asks"`
-	Bids []orderbookEntry `json:"bids"`
+	Error string           `json:"error"`
+	Asks  []orderbookEntry `json:"asks"`
+	Bids  []orderbookEntry `json:"bids"`
 }
 
 type OrderBookEntry struct {
@@ -153,20 +158,19 @@ func (c *Client) OrderBook(pair string) (
 	return convert(r.Bids), convert(r.Asks), nil
 }
 
-
 type trade struct {
-	Timestamp int64 `json:"timestamp"`
-	Price string `json:"price"`
-	Volume string `json:"volume"`
+	Timestamp int64  `json:"timestamp"`
+	Price     string `json:"price"`
+	Volume    string `json:"volume"`
 }
 
 type trades struct {
-	Error string `json:"error"`
+	Error  string  `json:"error"`
 	Trades []trade `json:"trades"`
 }
 
 type Trade struct {
-	Timestamp time.Time
+	Timestamp     time.Time
 	Price, Volume float64
 }
 
@@ -198,6 +202,7 @@ type postorder struct {
 }
 
 type OrderType string
+
 const BID = OrderType("BID")
 const ASK = OrderType("ASK")
 
@@ -223,35 +228,36 @@ func (c *Client) PostOrder(pair string, order_type OrderType,
 }
 
 type order struct {
-	OrderId             string `json:"order_id"`
-	CreationTimestamp   int64  `json:"creation_timestamp"`
-	Type                string `json:"type"`
-	State               string `json:"state"`
-	LimitPrice          string `json:"limit_price"`
-	LimitVolume         string `json:"limit_volume"`
-	Base                string `json:"base"`
-	Counter             string `json:"counter"`
-	FeeBase             string `json:"fee_base"`
-	FeeCounter          string `json:"fee_counter"`
+	OrderId           string `json:"order_id"`
+	CreationTimestamp int64  `json:"creation_timestamp"`
+	Type              string `json:"type"`
+	State             string `json:"state"`
+	LimitPrice        string `json:"limit_price"`
+	LimitVolume       string `json:"limit_volume"`
+	Base              string `json:"base"`
+	Counter           string `json:"counter"`
+	FeeBase           string `json:"fee_base"`
+	FeeCounter        string `json:"fee_counter"`
 }
 
 type orders struct {
-	Error string `json:"error"`
+	Error  string  `json:"error"`
 	Orders []order `json:"orders"`
 }
 
 type OrderState string
+
 const Pending = OrderState("PENDING")
 const Complete = OrderState("COMPLETE")
 
 type Order struct {
-	Id string
-	CreatedAt time.Time
-	Type OrderType
-	State OrderState
-	LimitPrice float64
-	LimitVolume float64
-	Base, Counter float64
+	Id                  string
+	CreatedAt           time.Time
+	Type                OrderType
+	State               OrderState
+	LimitPrice          float64
+	LimitVolume         float64
+	Base, Counter       float64
 	FeeBase, FeeCounter float64
 }
 
@@ -290,7 +296,7 @@ func (c *Client) ListOrders(pair string) ([]Order, error) {
 }
 
 type stoporder struct {
-	Success bool `json:"success"`
+	Success bool   `json:"success"`
 	Error   string `json:"error"`
 }
 
@@ -310,13 +316,13 @@ func (c *Client) StopOrder(id string) error {
 }
 
 type balance struct {
-	Asset string `json:"asset"`
-	Balance string `json:"balance"`
+	Asset    string `json:"asset"`
+	Balance  string `json:"balance"`
 	Reserved string `json:"reserved"`
 }
 
 type balances struct {
-	Error string `json:"error"`
+	Error   string    `json:"error"`
 	Balance []balance `json:"balance"`
 }
 
