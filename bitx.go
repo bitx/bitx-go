@@ -1,5 +1,5 @@
 // Go wrapper for the BitX API.
-// The API is documented here: https://bitx.co.za/api
+// The API is documented here: https://bitx.co/api
 package bitx
 
 import "time"
@@ -344,4 +344,24 @@ func (c *Client) Balance(asset string) (
 	balance = atofloat64(r.Balance[0].Balance)
 	reserved = atofloat64(r.Balance[0].Reserved)
 	return balance, reserved, nil
+}
+
+func (c *Client) Send(amount, currency, address, desc, message string) error {
+	form := make(url.Values)
+	form.Add("amount", amount)
+	form.Add("currency", currency)
+	form.Add("address", address)
+	form.Add("description", desc)
+	form.Add("message", message)
+
+	var r stoporder
+	err := c.call("POST", "/api/1/send", form, &r)
+	if err != nil {
+		return err
+	}
+	if r.Error != "" {
+		return errors.New("BitX error: " + r.Error)
+	}
+
+	return nil
 }
