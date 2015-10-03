@@ -77,11 +77,12 @@ type ticker struct {
 	Bid       string `json:"bid"`
 	Ask       string `json:"ask"`
 	Last      string `json:"last_trade"`
+	Volume24H string `json:"rolling_24_hour_volume"`
 }
 
 type Ticker struct {
-	Timestamp      time.Time
-	Bid, Ask, Last float64
+	Timestamp                 time.Time
+	Bid, Ask, Last, Volume24H float64
 }
 
 // Returns the latest ticker indicators for the given currency pair..
@@ -112,7 +113,12 @@ func (c *Client) Ticker(pair string) (Ticker, error) {
 		return Ticker{}, err
 	}
 
-	return Ticker{t, bid, ask, last}, nil
+	volume24h, err := strconv.ParseFloat(r.Volume24H, 64)
+	if err != nil {
+		return Ticker{}, err
+	}
+
+	return Ticker{t, bid, ask, last, volume24h}, nil
 }
 
 type orderbookEntry struct {
