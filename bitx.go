@@ -2,18 +2,21 @@
 // The API is documented here: https://bitx.co/api
 package bitx
 
-import "time"
-import "net/http"
-import "net/url"
-import "errors"
-import "encoding/json"
-import "strconv"
-import "fmt"
-import "bytes"
-import "io/ioutil"
-import _ "crypto/sha512"
+import (
+	"bytes"
+	_ "crypto/sha512"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
+	"time"
+)
 
-const userAgent = "bitx-go/0.0.2"
+const userAgent = "bitx-go/0.0.3"
 
 var base = url.URL{Scheme: "https", Host: "api.mybitx.com"}
 
@@ -234,6 +237,7 @@ func (c *Client) PostOrder(pair string, order_type OrderType,
 }
 
 type order struct {
+	Error             string `json:"error"`
 	OrderId           string `json:"order_id"`
 	CreationTimestamp int64  `json:"creation_timestamp"`
 	Type              string `json:"type"`
@@ -272,6 +276,21 @@ func atofloat64(s string) float64 {
 	return f
 }
 
+func parseOrder(bo order) Order {
+	var o Order
+	o.Id = bo.OrderId
+	o.Type = OrderType(bo.Type)
+	o.State = OrderState(bo.State)
+	o.CreatedAt = time.Unix(bo.CreationTimestamp/1000, 0)
+	o.LimitPrice = atofloat64(bo.LimitPrice)
+	o.LimitVolume = atofloat64(bo.LimitVolume)
+	o.Base = atofloat64(bo.Base)
+	o.Counter = atofloat64(bo.Counter)
+	o.FeeBase = atofloat64(bo.FeeBase)
+	o.FeeCounter = atofloat64(bo.FeeCounter)
+	return o
+}
+
 // Returns a list of the most recently placed orders.
 // The list is truncated after 100 items.
 func (c *Client) ListOrders(pair string) ([]Order, error) {
@@ -286,19 +305,35 @@ func (c *Client) ListOrders(pair string) ([]Order, error) {
 
 	orders := make([]Order, len(r.Orders))
 	for i, bo := range r.Orders {
-		o := &orders[i]
-		o.Id = bo.OrderId
-		o.Type = OrderType(bo.Type)
-		o.State = OrderState(bo.State)
-		o.CreatedAt = time.Unix(bo.CreationTimestamp/1000, 0)
-		o.LimitPrice = atofloat64(bo.LimitPrice)
-		o.LimitVolume = atofloat64(bo.LimitVolume)
-		o.Base = atofloat64(bo.Base)
-		o.Counter = atofloat64(bo.Counter)
-		o.FeeBase = atofloat64(bo.FeeBase)
-		o.FeeCounter = atofloat64(bo.FeeCounter)
+		orders[i] = parseOrder(bo)
 	}
 	return orders, nil
+}
+
+var pathIDRegex = regexp.MustCompile("^[[:alnum:]]+$")
+
+func isValidPathID(id string) bool {
+	if len(id) == 0 || len(id) > 255 {
+		return false
+	}
+	return pathIDRegex.MatchString(id)
+}
+
+// Get an order by its id.
+func (c *Client) GetOrder(id string) (*Order, error) {
+	if !isValidPathID(id) {
+		return nil, errors.New("invalid order id")
+	}
+	var bo order
+	err := c.call("GET", "/api/1/orders/"+id, nil, &bo)
+	if err != nil {
+		return nil, err
+	}
+	if bo.Error != "" {
+		return nil, errors.New("BitX error: " + bo.Error)
+	}
+	o := parseOrder(bo)
+	return &o, nil
 }
 
 type stoporder struct {
