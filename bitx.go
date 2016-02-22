@@ -357,14 +357,35 @@ func (c *Client) StopOrder(id string) error {
 }
 
 type balance struct {
-	Asset    string `json:"asset"`
-	Balance  string `json:"balance"`
-	Reserved string `json:"reserved"`
+	Asset       string `json:"asset"`
+	Balance     string `json:"balance"`
+	Reserved    string `json:"reserved"`
+	Unconfirmed string `json:"unconfirmed"`
 }
 
 type balances struct {
 	Error   string    `json:"error"`
 	Balance []balance `json:"balance"`
+}
+
+type Balance struct {
+	Asset       string
+	Balance     float64
+	Reserved    float64
+	Unconfirmed float64
+}
+
+func parseBalances(bal []balance) []Balance {
+	var bl []Balance
+	for _, b := range bal {
+		var r Balance
+		r.Asset = b.Asset
+		r.Balance = atofloat64(b.Balance)
+		r.Reserved = atofloat64(b.Reserved)
+		r.Unconfirmed = atofloat64(b.Unconfirmed)
+		bl = append(bl, r)
+	}
+	return bl
 }
 
 // Returns the trading account balance and reserved funds.
@@ -381,10 +402,21 @@ func (c *Client) Balance(asset string) (
 	if len(r.Balance) == 0 {
 		return 0, 0, errors.New("Balance not returned")
 	}
+	bl := parseBalances(r.Balance)
+	return bl[0].Balance, bl[0].Reserved, nil
+}
 
-	balance = atofloat64(r.Balance[0].Balance)
-	reserved = atofloat64(r.Balance[0].Reserved)
-	return balance, reserved, nil
+// Balances return the balances of all accounts.
+func (c *Client) Balances() ([]Balance, error) {
+	var r balances
+	err := c.call("GET", "/api/1/balance", nil, &r)
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, errors.New("BitX error: " + r.Error)
+	}
+	return parseBalances(r.Balance), nil
 }
 
 func (c *Client) Send(amount, currency, address, desc, message string) error {
