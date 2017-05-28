@@ -1,7 +1,7 @@
 bitx-go
 =======
 
-This Go package providers a wrapper for the [BitX API](https://bitx.co/api).
+This Go package providers a wrapper for the [Luno API](https://www.luno.com/api).
 
 ## Usage
 

@@ -1,5 +1,5 @@
-// Go wrapper for the BitX API.
-// The API is documented here: https://bitx.co/api
+// Go wrapper for the Luno API.
+// The API is documented here: https://www.luno.com/api
 package bitx
 
 import (
@@ -28,6 +28,11 @@ type Client struct {
 // API.
 func NewClient(api_key_id, api_key_secret string) *Client {
 	return &Client{api_key_id, api_key_secret}
+}
+
+type errorResp struct {
+	Error     string `json:"error"`
+	ErrorCode string `json:"error_code"`
 }
 
 func (c *Client) call(method, path string, params url.Values,
@@ -67,11 +72,21 @@ func (c *Client) call(method, path string, params url.Values,
 			r.StatusCode, r.Status, string(body)))
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(result); err != nil {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	var errResult errorResp
+	if err := json.Unmarshal(data, &errResult); err != nil {
+		return err
+	}
+
+	if errResult.Error != "" || errResult.ErrorCode != "" {
+		return fmt.Errorf("bitx: remote error %s %s", errResult.ErrorCode, errResult.Error)
+	}
+
+	return json.Unmarshal(data, &result)
 }
 
 type ticker struct {
@@ -216,13 +231,22 @@ const BID = OrderType("BID")
 const ASK = OrderType("ASK")
 
 // Create a new trade order.
+// Specify zero for baseAccountID and counterAccountID to use your default
+// accounts.
 func (c *Client) PostOrder(pair string, order_type OrderType,
-	volume, price float64) (string, error) {
+	volume, price float64,
+	baseAccountID, counterAccountID string) (string, error) {
 	form := make(url.Values)
 	form.Add("volume", fmt.Sprintf("%f", volume))
 	form.Add("price", fmt.Sprintf("%f", price))
 	form.Add("pair", pair)
 	form.Add("type", string(order_type))
+	if baseAccountID != "" {
+		form.Add("base_account_id", baseAccountID)
+	}
+	if counterAccountID != "" {
+		form.Add("counter_account_id", counterAccountID)
+	}
 
 	var r postorder
 	err := c.call("POST", "/api/1/postorder", form, &r)
@@ -291,11 +315,17 @@ func parseOrder(bo order) Order {
 	return o
 }
 
-// Returns a list of the most recently placed orders.
+// Returns a list of placed orders.
 // The list is truncated after 100 items.
-func (c *Client) ListOrders(pair string) ([]Order, error) {
+// If state is an empty string, the list won't be filtered by state.
+func (c *Client) ListOrders(pair string, state OrderState) ([]Order, error) {
+	params := url.Values{"pair": {pair}}
+	if state != "" {
+		params.Add("state", string(state))
+	}
+
 	var r orders
-	err := c.call("GET", "/api/1/listorders", url.Values{"pair": {pair}}, &r)
+	err := c.call("GET", "/api/1/listorders", params, &r)
 	if err != nil {
 		return nil, err
 	}
@@ -357,6 +387,7 @@ func (c *Client) StopOrder(id string) error {
 }
 
 type balance struct {
+	AccountID   string `json:"account_id"`
 	Asset       string `json:"asset"`
 	Balance     string `json:"balance"`
 	Reserved    string `json:"reserved"`
@@ -369,6 +400,7 @@ type balances struct {
 }
 
 type Balance struct {
+	AccountID   string `json:"account_id"`
 	Asset       string
 	Balance     float64
 	Reserved    float64
@@ -379,6 +411,7 @@ func parseBalances(bal []balance) []Balance {
 	var bl []Balance
 	for _, b := range bal {
 		var r Balance
+		r.AccountID = b.AccountID
 		r.Asset = b.Asset
 		r.Balance = atofloat64(b.Balance)
 		r.Reserved = atofloat64(b.Reserved)
@@ -437,4 +470,134 @@ func (c *Client) Send(amount, currency, address, desc, message string) error {
 	}
 
 	return nil
+}
+
+type address struct {
+	Asset            string `json:"asset"`
+	Address          string `json:"address"`
+	TotalReceived    string `json:"total_received"`
+	TotalUnconfirmed string `json:"total_unconfirmed"`
+	Error            string `json:"error"`
+}
+
+type Address struct {
+	Asset            string
+	Address          string
+	TotalReceived    float64
+	TotalUnconfirmed float64
+}
+
+func parseAddress(a address) (Address, error) {
+	if a.Error != "" {
+		return Address{}, errors.New("BitX error: " + a.Error)
+	}
+	var r Address
+	r.Asset = a.Asset
+	r.Address = a.Address
+	r.TotalReceived = atofloat64(a.TotalReceived)
+	r.TotalUnconfirmed = atofloat64(a.TotalUnconfirmed)
+
+	return r, nil
+}
+
+// GetReceiveAddress returns the default receive address associated with your
+// account and the amount received via the address, but can take optional
+// parameter to check non-default address
+func (c *Client) GetReceiveAddress(asset string, receiveAddress string) (Address, error) {
+	var a address
+	urlValues := url.Values{"asset": {asset}, "address": {receiveAddress}}
+	err := c.call("GET", "/api/1/funding_address", urlValues, &a)
+	if err != nil {
+		return Address{}, err
+	}
+
+	return parseAddress(a)
+}
+
+// NewReceiveAddress allocates a new receive address to your account.
+// There is a rate limit of 1 address per hour, but bursts of up to 10
+// addresses are allowed.
+func (c *Client) NewReceiveAddress(asset string) (Address, error) {
+	var a address
+	urlValues := url.Values{"asset": {asset}}
+	err := c.call("POST", "/api/1/funding_address", urlValues, &a)
+	if err != nil {
+		return Address{}, err
+	}
+
+	return parseAddress(a)
+}
+
+// FeeInfo hold information about the user's fees and trading volume.
+type FeeInfo struct {
+	ThirtyDayVolume float64 `json:"thirty_day_volume,string"`
+	MakerFee        float64 `json:"maker_fee,string"`
+	TakerFee        float64 `json:"taker_fee,string"`
+}
+
+// GetFeeInfo returns information about the user's fees and trading volume.
+func (c *Client) GetFeeInfo(pair string) (FeeInfo, error) {
+	var fi FeeInfo
+	urlValues := url.Values{"pair": {pair}}
+	err := c.call("GET", "/api/1/fee_info", urlValues, &fi)
+	if err != nil {
+		return FeeInfo{}, err
+	}
+
+	return fi, nil
+}
+
+// QuoteResponse contains information about a specific quote
+type QuoteResponse struct {
+	ID            int64   `json:"id, string"`
+	Type          string  `json:"type"`
+	Pair          string  `json:"pair"`
+	BaseAmount    float64 `json:"base_amount, string"`
+	CounterAmount float64 `json:"counter_amount, string"`
+	CreatedAt     int64   `json:"created_at"`
+	ExpiresAt     int64   `json:"expires_at"`
+	Discarded     bool    `json:"discarded"`
+	Exercised     bool    `json:"exercised"`
+}
+
+// CreateQuote creates a quote of the given type (BUY or SELL) for the given
+// baseAmount of a specific pair (like XBTZAR)
+func (c *Client) CreateQuote(quoteType, baseAmount, pair string) (QuoteResponse, error) {
+	if quoteType != "BUY" && quoteType != "SELL" {
+		return QuoteResponse{}, errors.New("quoteType must be either 'BUY' or 'SELL'")
+	}
+	var qr QuoteResponse
+	urlValues := url.Values{"quote_type": {quoteType}, "base_amount": {baseAmount}, "pair": {pair}}
+	err := c.call("POST", "/api/1/quotes", urlValues, &qr)
+	if err != nil {
+		return QuoteResponse{}, err
+	}
+
+	return qr, nil
+}
+
+func (c *Client) quoteHandler(id, method string) (QuoteResponse, error) {
+	var qr QuoteResponse
+	err := c.call(method, "/api/1/quotes/"+id, nil, &qr)
+
+	if err != nil {
+		return QuoteResponse{}, err
+	}
+
+	return qr, nil
+}
+
+// GetQuote returns the details of the specified quote
+func (c *Client) GetQuote(id string) (QuoteResponse, error) {
+	return c.quoteHandler(id, "GET")
+}
+
+// ExerciseQuote accepts the given quote
+func (c *Client) ExerciseQuote(id string) (QuoteResponse, error) {
+	return c.quoteHandler(id, "PUT")
+}
+
+// DeleteQuote rejects a quote
+func (c *Client) DeleteQuote(id string) (QuoteResponse, error) {
+	return c.quoteHandler(id, "DELETE")
 }
