@@ -98,7 +98,7 @@ func Dial(keyID, keySecret, pair string) (*Conn, error) {
 }
 
 var wsHost = flag.String(
-	"luno_websocket_host", "wss://ws.bitx.co", "Luno API websocket host")
+	"luno_websocket_host", "wss://ws.luno.com", "Luno API websocket host")
 
 func (c *Conn) manageForever() {
 	attempts := 0
