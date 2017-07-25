@@ -601,3 +601,36 @@ func (c *Client) ExerciseQuote(id string) (QuoteResponse, error) {
 func (c *Client) DeleteQuote(id string) (QuoteResponse, error) {
 	return c.quoteHandler(id, "DELETE")
 }
+
+type OrderTrade struct {
+	Base       float64   `json:"base,string"`
+	Counter    float64   `json:"counter,string"`
+	FeeBase    float64   `json:"fee_base,string"`
+	FeeCounter float64   `json:"fee_counter,string"`
+	IsBuy      bool      `json:"is_buy"`
+	OrderID    string    `json:"order_id"`
+	Pair       string    `json:"pair"`
+	Price      float64   `json:"price,string"`
+	Timestamp  int64     `json:"timestamp"`
+	Type       OrderType `json:"type"`
+	Volume     float64   `json:"volume,string"`
+}
+
+type tradeResp struct {
+	Trades []OrderTrade `json:"trades"`
+}
+
+// ListTrades returns trades in your account for the given pair, sortest by
+// oldest first, since the given timestamp.
+func (c *Client) ListTrades(pair string, since int64) ([]OrderTrade, error) {
+	params := url.Values{
+		"pair":  {pair},
+		"since": {strconv.FormatInt(since, 10)},
+	}
+	var resp tradeResp
+	err := c.call("GET", "/api/1/listtrades", params, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Trades, nil
+}
