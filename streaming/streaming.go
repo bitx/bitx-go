@@ -288,7 +288,7 @@ func (c *Conn) receivedUpdate(u Update) error {
 	c.seq = u.Sequence
 
 	if c.updateCallback != nil {
-		go c.updateCallback(u)
+		c.updateCallback(u)
 	}
 
 	return nil
