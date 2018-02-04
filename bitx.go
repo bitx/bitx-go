@@ -452,7 +452,12 @@ func (c *Client) Balances() ([]Balance, error) {
 	return parseBalances(r.Balance), nil
 }
 
-func (c *Client) Send(amount, currency, address, desc, message string) error {
+type sendResp struct {
+	Success      bool   `json:"success"`
+	WithdrawalID string `json:"withdrawal_id"`
+}
+
+func (c *Client) Send(amount, currency, address, desc, message string) (string, error) {
 	form := make(url.Values)
 	form.Add("amount", amount)
 	form.Add("currency", currency)
@@ -460,16 +465,10 @@ func (c *Client) Send(amount, currency, address, desc, message string) error {
 	form.Add("description", desc)
 	form.Add("message", message)
 
-	var r stoporder
+	var r sendResp
 	err := c.call("POST", "/api/1/send", form, &r)
-	if err != nil {
-		return err
-	}
-	if r.Error != "" {
-		return errors.New("BitX error: " + r.Error)
-	}
 
-	return nil
+	return r.WithdrawalID, err
 }
 
 type address struct {
@@ -633,4 +632,23 @@ func (c *Client) ListTrades(pair string, since int64) ([]OrderTrade, error) {
 		return nil, err
 	}
 	return resp.Trades, nil
+}
+
+type Withdrawal struct {
+	ID        string  `json:"id"`
+	Status    string  `json:"status"`
+	CreatedAt int64   `json:"created_at"`
+	Type      string  `json:"type"`
+	Currency  string  `json:"currency"`
+	Amount    float64 `json:"amount,string"`
+	Fee       float64 `json:"fee,string"`
+}
+
+func (c *Client) GetWithdrawal(id string) (*Withdrawal, error) {
+	var w Withdrawal
+	err := c.call("GET", "/api/1/withdrawals/"+id, nil, &w)
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
 }
