@@ -88,6 +88,10 @@ type Conn struct {
 // data for the given market pair.
 // The connection will automatically reconnect on error.
 func Dial(keyID, keySecret, pair string) (*Conn, error) {
+	if keyID == "" || keySecret == "" {
+		return nil, errors.New("streaming API requires credentials")
+	}
+
 	c := &Conn{
 		keyID:     keyID,
 		keySecret: keySecret,
