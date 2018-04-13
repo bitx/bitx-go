@@ -12,28 +12,28 @@ type orderBook struct {
 	Bids     []*order `json:"bids"`
 }
 
-type tradeUpdate struct {
+type TradeUpdate struct {
 	Base    float64 `json:"base,string"`
 	Counter float64 `json:"counter,string"`
 	OrderID string  `json:"order_id"`
 }
 
-type createUpdate struct {
+type CreateUpdate struct {
 	OrderID string  `json:"order_id"`
 	Type    string  `json:"type"`
 	Price   float64 `json:"price,string"`
 	Volume  float64 `json:"volume,string"`
 }
 
-type deleteUpdate struct {
+type DeleteUpdate struct {
 	OrderID string `json:"order_id"`
 }
 
-type update struct {
+type Update struct {
 	Sequence     int64          `json:"sequence,string"`
-	TradeUpdates []*tradeUpdate `json:"trade_updates"`
-	CreateUpdate *createUpdate  `json:"create_update"`
-	DeleteUpdate *deleteUpdate  `json:"delete_update"`
+	TradeUpdates []*TradeUpdate `json:"trade_updates"`
+	CreateUpdate *CreateUpdate  `json:"create_update"`
+	DeleteUpdate *DeleteUpdate  `json:"delete_update"`
 	Timestamp    int64          `json:"timestamp"`
 }
 

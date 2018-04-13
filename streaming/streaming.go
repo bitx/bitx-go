@@ -68,9 +68,12 @@ func flatten(m map[string]order, reverse bool) []bitx.OrderBookEntry {
 	return ol
 }
 
+type UpdateCallback func(Update)
+
 type Conn struct {
 	keyID, keySecret string
 	pair             string
+	updateCallback   UpdateCallback
 
 	ws     *websocket.Conn
 	closed bool
@@ -97,6 +100,10 @@ func Dial(keyID, keySecret, pair string) (*Conn, error) {
 		keySecret: keySecret,
 		pair:      pair,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+
 	go c.manageForever()
 	return c, nil
 }
@@ -196,7 +203,7 @@ func (c *Conn) connect() error {
 			continue
 		}
 
-		var u update
+		var u Update
 		if err := json.Unmarshal(data, &u); err != nil {
 			return err
 		}
@@ -243,7 +250,7 @@ func (c *Conn) receivedOrderBook(ob orderBook) error {
 	return nil
 }
 
-func (c *Conn) receivedUpdate(u update) error {
+func (c *Conn) receivedUpdate(u Update) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -284,6 +291,10 @@ func (c *Conn) receivedUpdate(u update) error {
 	c.lastMessage = time.Now()
 	c.seq = u.Sequence
 
+	if c.updateCallback != nil {
+		c.updateCallback(u)
+	}
+
 	return nil
 }
 
@@ -314,7 +325,7 @@ func decTrade(m map[string]order, id string, base float64) (bool, error) {
 	return true, nil
 }
 
-func (c *Conn) processTrade(t tradeUpdate) error {
+func (c *Conn) processTrade(t TradeUpdate) error {
 	if t.Base <= 0 {
 		return errors.New("nonpositive trade")
 	}
@@ -338,7 +349,7 @@ func (c *Conn) processTrade(t tradeUpdate) error {
 	return errors.New("trade for unknown order")
 }
 
-func (c *Conn) processCreate(u createUpdate) error {
+func (c *Conn) processCreate(u CreateUpdate) error {
 	o := order{
 		ID:     u.OrderID,
 		Price:  u.Price,
@@ -356,7 +367,7 @@ func (c *Conn) processCreate(u createUpdate) error {
 	return nil
 }
 
-func (c *Conn) processDelete(u deleteUpdate) error {
+func (c *Conn) processDelete(u DeleteUpdate) error {
 	delete(c.bids, u.OrderID)
 	delete(c.asks, u.OrderID)
 	return nil
