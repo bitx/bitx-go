@@ -566,7 +566,7 @@ func (c *Client) CreateQuote(quoteType, baseAmount, pair string) (QuoteResponse,
 		return QuoteResponse{}, errors.New("quoteType must be either 'BUY' or 'SELL'")
 	}
 	var qr QuoteResponse
-	urlValues := url.Values{"quote_type": {quoteType}, "base_amount": {baseAmount}, "pair": {pair}}
+	urlValues := url.Values{"type": {quoteType}, "base_amount": {baseAmount}, "pair": {pair}}
 	err := c.call("POST", "/api/1/quotes", urlValues, &qr)
 	if err != nil {
 		return QuoteResponse{}, err
