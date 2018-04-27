@@ -41,7 +41,7 @@ func (c *Client) call(method, path string, params url.Values,
 	u.Path = path
 
 	var body *bytes.Reader
-	if method == "GET" {
+	if method == "GET" || method == "PUT" || method == "DELETE" {
 		u.RawQuery = params.Encode()
 		body = bytes.NewReader(nil)
 	} else if method == "POST" {
