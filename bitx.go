@@ -548,11 +548,11 @@ func (c *Client) GetFeeInfo(pair string) (FeeInfo, error) {
 
 // QuoteResponse contains information about a specific quote
 type QuoteResponse struct {
-	ID            int64   `json:"id, string"`
+	ID            int64   `json:"id,string"`
 	Type          string  `json:"type"`
 	Pair          string  `json:"pair"`
-	BaseAmount    float64 `json:"base_amount, string"`
-	CounterAmount float64 `json:"counter_amount, string"`
+	BaseAmount    float64 `json:"base_amount,string"`
+	CounterAmount float64 `json:"counter_amount,string"`
 	CreatedAt     int64   `json:"created_at"`
 	ExpiresAt     int64   `json:"expires_at"`
 	Discarded     bool    `json:"discarded"`
