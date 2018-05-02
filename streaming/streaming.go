@@ -90,7 +90,7 @@ type Conn struct {
 // Dial initiates a connection to the streaming service and starts processing
 // data for the given market pair.
 // The connection will automatically reconnect on error.
-func Dial(keyID, keySecret, pair string) (*Conn, error) {
+func Dial(keyID, keySecret, pair string, opts ...DialOption) (*Conn, error) {
 	if keyID == "" || keySecret == "" {
 		return nil, errors.New("streaming API requires credentials")
 	}
