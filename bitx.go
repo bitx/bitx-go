@@ -549,11 +549,11 @@ func (c *Client) GetFeeInfo(pair string) (FeeInfo, error) {
 
 // QuoteResponse contains information about a specific quote
 type QuoteResponse struct {
-	ID            int64   `json:"id, string"`
+	ID            int64   `json:"id,string"`
 	Type          string  `json:"type"`
 	Pair          string  `json:"pair"`
-	BaseAmount    float64 `json:"base_amount, string"`
-	CounterAmount float64 `json:"counter_amount, string"`
+	BaseAmount    float64 `json:"base_amount,string"`
+	CounterAmount float64 `json:"counter_amount,string"`
 	CreatedAt     int64   `json:"created_at"`
 	ExpiresAt     int64   `json:"expires_at"`
 	Discarded     bool    `json:"discarded"`
@@ -567,7 +567,7 @@ func (c *Client) CreateQuote(quoteType, baseAmount, pair string) (QuoteResponse,
 		return QuoteResponse{}, errors.New("quoteType must be either 'BUY' or 'SELL'")
 	}
 	var qr QuoteResponse
-	urlValues := url.Values{"quote_type": {quoteType}, "base_amount": {baseAmount}, "pair": {pair}}
+	urlValues := url.Values{"type": {quoteType}, "base_amount": {baseAmount}, "pair": {pair}}
 	err := c.call("POST", "/api/1/quotes", urlValues, &qr)
 	if err != nil {
 		return QuoteResponse{}, err
@@ -648,6 +648,19 @@ type Withdrawal struct {
 func (c *Client) GetWithdrawal(id string) (*Withdrawal, error) {
 	var w Withdrawal
 	err := c.call("GET", "/api/1/withdrawals/"+id, nil, &w)
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
+type WithdrawalList struct {
+	Withdrawals []Withdrawal `json:"withdrawals"`
+}
+
+func (c *Client) GetWithdrawals() (*WithdrawalList, error) {
+	var w WithdrawalList
+	err := c.call("GET", "/api/1/withdrawals", nil, &w)
 	if err != nil {
 		return nil, err
 	}
