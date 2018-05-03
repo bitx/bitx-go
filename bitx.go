@@ -652,3 +652,16 @@ func (c *Client) GetWithdrawal(id string) (*Withdrawal, error) {
 	}
 	return &w, nil
 }
+
+type WithdrawalList struct {
+	Withdrawals []Withdrawal `json:"withdrawals"`
+}
+
+func (c *Client) GetWithdrawals() (*WithdrawalList, error) {
+	var w WithdrawalList
+	err := c.call("GET", "/api/1/withdrawals", nil, &w)
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
