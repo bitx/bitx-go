@@ -31,11 +31,6 @@ func NewClient(apiKeyID, apiKeySecret string) *Client {
 	return &Client{apiKeyID, apiKeySecret, defaultBaseURL}
 }
 
-// For internal use.
-func NewClientWithBaseURL(apiKeyID, apiKeySecret string, baseURL url.URL) *Client {
-	return &Client{apiKeyID, apiKeySecret, baseURL}
-}
-
 type errorResp struct {
 	Error     string `json:"error"`
 	ErrorCode string `json:"error_code"`
@@ -657,4 +652,9 @@ func (c *Client) GetWithdrawal(id string) (*Withdrawal, error) {
 		return nil, err
 	}
 	return &w, nil
+}
+
+// For internal use.
+func (c *Client) SetBaseURL(url url.URL) {
+	c.baseURL = url
 }
