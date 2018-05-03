@@ -41,11 +41,13 @@ func (c *Client) call(method, path string, params url.Values,
 	u.Path = path
 
 	var body *bytes.Reader
-	if method == "GET" || method == "PUT" || method == "DELETE" {
+	if method == "GET" {
 		u.RawQuery = params.Encode()
 		body = bytes.NewReader(nil)
-	} else if method == "POST" {
+	} else if method == "POST" || method == "PUT" || method == "PATCH" {
 		body = bytes.NewReader([]byte(params.Encode()))
+	} else if method == "DELETE" {
+		body = bytes.NewReader(nil)
 	} else {
 		return errors.New("Unsupported method")
 	}
