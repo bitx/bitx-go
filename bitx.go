@@ -668,7 +668,7 @@ func (c *Client) GetWithdrawals() (*WithdrawalList, error) {
 
 type WithdrawalResponse struct {
 	ID     int64  `json:"id,string"`
-	Status string `json:"type"`
+	Status string `json:"status"`
 }
 
 // RequestWithdrawal creates a withdrawal request of the given type for the given
