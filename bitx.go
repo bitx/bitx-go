@@ -665,3 +665,21 @@ func (c *Client) GetWithdrawals() (*WithdrawalList, error) {
 	}
 	return &w, nil
 }
+
+type WithdrawalResponse struct {
+	ID     int64  `json:"id,string"`
+	Status string `json:"type"`
+}
+
+// RequestWithdrawal creates a withdrawal request of the given type for the given
+// amount to a specific beneficiary
+func (c *Client) RequestWithdrawal(withdrawalType string, amount string, beneficiaryID string) (WithdrawalResponse, error) {
+	var wr WithdrawalResponse
+	urlValues := url.Values{"type": {withdrawalType}, "amount": {amount}, "beneficiary_id": {beneficiaryID}}
+	err := c.call("POST", "api/1/withdrawals", urlValues, &wr)
+	if err != nil {
+		return WithdrawalResponse{}, err
+	}
+
+	return wr, nil
+}
