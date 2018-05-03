@@ -18,16 +18,17 @@ import (
 
 const userAgent = "bitx-go/0.0.3"
 
-var base = url.URL{Scheme: "https", Host: "api.mybitx.com"}
+var defaultBaseURL = url.URL{Scheme: "https", Host: "api.mybitx.com"}
 
 type Client struct {
-	api_key_id, api_key_secret string
+	apiKeyID, apiKeySecret string
+	baseURL                url.URL
 }
 
 // Pass an empty string for the api_key_id if you will only access the public
 // API.
-func NewClient(api_key_id, api_key_secret string) *Client {
-	return &Client{api_key_id, api_key_secret}
+func NewClient(apiKeyID, apiKeySecret string) *Client {
+	return &Client{apiKeyID, apiKeySecret, defaultBaseURL}
 }
 
 type errorResp struct {
@@ -37,7 +38,7 @@ type errorResp struct {
 
 func (c *Client) call(method, path string, params url.Values,
 	result interface{}) error {
-	u := base
+	u := c.baseURL
 	u.Path = path
 
 	var body *bytes.Reader
@@ -56,8 +57,8 @@ func (c *Client) call(method, path string, params url.Values,
 	if err != nil {
 		return err
 	}
-	if c.api_key_id != "" {
-		req.SetBasicAuth(c.api_key_id, c.api_key_secret)
+	if c.apiKeyID != "" {
+		req.SetBasicAuth(c.apiKeyID, c.apiKeySecret)
 	}
 	req.Header.Add("User-Agent", userAgent)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -666,4 +667,9 @@ func (c *Client) GetWithdrawals() (*WithdrawalList, error) {
 		return nil, err
 	}
 	return &w, nil
+}
+
+// For internal use.
+func (c *Client) SetBaseURL(url url.URL) {
+	c.baseURL = url
 }
