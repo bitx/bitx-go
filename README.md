@@ -1,3 +1,5 @@
+*NOTE: This SDK is being replaced by https://github.com/luno/luno-go. For more information, please see https://www.luno.com/blog/en/post/new-luno-api-sdks.*
+
 bitx-go
 =======
 
