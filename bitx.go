@@ -263,6 +263,70 @@ func (c *Client) PostOrder(pair string, order_type OrderType,
 	return r.OrderId, nil
 }
 
+/*
+ * PostMarketBuy will execute an immediate buy order. This may be subject to fees.
+ * spend is the amount of local currency (eg ZAR) to spend. The maximum amount
+ * of Bitcoin possible will be bought for this amount, at the current market rate
+ * base and counter account IDs can be set to "" to use default accounts
+ */
+func (c *Client) PostMarketBuy(pair string, spend float64,
+	baseAccountID, counterAccountID string) (string, error) {
+
+	form := make(url.Values)
+	form.Add("type", "BUY")
+	form.Add("pair", pair)
+	form.Add("counter_volume", fmt.Sprintf("%f", spend))
+	if baseAccountID != "" {
+		form.Add("base_account_id", baseAccountID)
+	}
+	if counterAccountID != "" {
+		form.Add("counter_account_id", counterAccountID)
+	}
+
+	var r postorder
+	err := c.call("POST", "api/1/marketorder", form, &r)
+	if err != nil {
+		return "", err
+	}
+	if r.Error != "" {
+		return "", errors.New("Luno error: " + r.Error)
+	}
+
+	return r.OrderId, nil
+}
+
+/*
+ * PostMarketSell will execute an immediate sell order. This may be subject to fees.
+ * volume is the amount of Bitcoin to sell. It will be sold for the maximum amount of fiat
+ * possible at the current market rate
+ * base and counter account IDs can be set to "" to use default accounts
+ */
+func (c *Client) PostMarketSell(pair string, volume float64,
+	baseAccountID, counterAccountID string) (string, error) {
+
+	form := make(url.Values)
+	form.Add("type", "SELL")
+	form.Add("pair", pair)
+	form.Add("base_volume", fmt.Sprintf("%f", volume))
+	if baseAccountID != "" {
+		form.Add("base_account_id", baseAccountID)
+	}
+	if counterAccountID != "" {
+		form.Add("counter_account_id", counterAccountID)
+	}
+
+	var r postorder
+	err := c.call("POST", "api/1/marketorder", form, &r)
+	if err != nil {
+		return "", err
+	}
+	if r.Error != "" {
+		return "", errors.New("Luno error: " + r.Error)
+	}
+
+	return r.OrderId, nil
+}
+
 type order struct {
 	Error             string `json:"error"`
 	OrderId           string `json:"order_id"`
