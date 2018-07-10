@@ -637,6 +637,36 @@ func (c *Client) ListTrades(pair string, since int64) ([]OrderTrade, error) {
 	return resp.Trades, nil
 }
 
+type Transaction struct {
+	RowIndex       int64             `json:"row_index"`
+	Timestamp      int64             `json:"timestamp"`
+	Balance        float64           `json:"balance"`
+	Available      float64           `json:"available"`
+	BalanceDelta   float64           `json:"balance_delta"`
+	AvailableDelta float64           `json:"available_delta"`
+	Currency       string            `json:"currency"`
+	Description    string            `json:"description"`
+	Details        map[string]string `json:"details"`
+}
+
+type TransactionResponse struct {
+	ID           string        `json:"id"`
+	Transactions []Transaction `json:"transactions"`
+}
+
+func (c *Client) ListTransactions(accountID string, minRow int64, maxRow int64) (*TransactionResponse, error) {
+	params := url.Values{
+		"min_row": {strconv.FormatInt(minRow, 10)},
+		"max_row": {strconv.FormatInt(maxRow, 10)},
+	}
+	var r TransactionResponse
+	err := c.call("GET", "/api/1/accounts/"+accountID+"/transactions", params, &r)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
 type Withdrawal struct {
 	ID        string  `json:"id"`
 	Status    string  `json:"status"`
